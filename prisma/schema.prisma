@@ -1,0 +1,176 @@
+// Prisma Schema for PostgreSQL
+// Run: npx prisma generate && npx prisma db push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  role          Role      @default(USER)
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  registrations Registration[]
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+model Registration {
+  id                      String   @id @default(cuid())
+  applicationId           String   @unique
+  userId                  String?
+  user                    User?    @relation(fields: [userId], references: [id])
+  
+  // Company Details
+  companyType             String
+  companyName             String
+  businessActivity        String   @db.Text
+  registeredAddress       String
+  panNumber               String?
+  numberOfDirectors       Int?
+  capitalAmount           Float?
+  
+  // Contact Details
+  contactPerson           String
+  email                   String
+  phone                   String
+  
+  // Additional Services
+  additionalServices      String[]
+  
+  // Status & Payment
+  status                  RegistrationStatus @default(PENDING)
+  paymentStatus           PaymentStatus      @default(UNPAID)
+  totalFee                Float
+  paidAmount              Float              @default(0)
+  
+  // Dates
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  estimatedCompletionDate DateTime?
+  completedAt             DateTime?
+  
+  // Relations
+  documents               Document[]
+  payments                Payment[]
+  notes                   Note[]
+  
+  @@index([applicationId])
+  @@index([email])
+  @@index([status])
+}
+
+enum RegistrationStatus {
+  PENDING
+  PAYMENT_PENDING
+  DOCUMENTS_PENDING
+  PROCESSING
+  UNDER_REVIEW
+  APPROVED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  
+  name           String
+  type           String
+  url            String
+  size           Int
+  status         DocumentStatus @default(PENDING)
+  
+  uploadedAt     DateTime     @default(now())
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  rejectionReason String?
+  
+  @@index([registrationId])
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Payment {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  
+  amount         Float
+  method         PaymentMethod
+  gateway        String?
+  transactionId  String?
+  
+  status         PaymentTransactionStatus @default(PENDING)
+  
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+  
+  metadata       Json?
+  
+  @@index([registrationId])
+  @@index([transactionId])
+}
+
+enum PaymentMethod {
+  ESEWA
+  KHALTI
+  BANK_TRANSFER
+  CASH
+  CARD
+}
+
+enum PaymentTransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Note {
+  id             String       @id @default(cuid())
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  
+  content        String       @db.Text
+  createdBy      String
+  isInternal     Boolean      @default(false)
+  
+  createdAt      DateTime     @default(now())
+  
+  @@index([registrationId])
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
